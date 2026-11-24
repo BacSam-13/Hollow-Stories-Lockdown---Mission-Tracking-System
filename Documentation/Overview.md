@@ -1,33 +1,53 @@
-The porpouse of this task, was to develop a system to add missions, and being able to mark them as completed. All this, using the already existing inventory HUD.
-From that simple premise, new complex issues came aboard:
-  - Where to store the missions
-  - How mark them as completed
-  - How to deploy them properly on the HUD
+# Mission Management System
 
-Next, I will explain how I approached all of these issues, and how I came to the solution.
+The purpose of this task was to develop a system that allows missions to be added and marked as completed, all while using the existing Inventory HUD.
+
+From this seemingly simple premise, several more complex challenges arose:
+
+- Where to store the missions.
+- How to mark them as completed.
+- How to properly display them on the HUD.
+
+In the following sections, I will explain how I approached each of these challenges and how I developed a solution.
 
 # Storage
-Since the missions will be used during all game, they were stored as part of the GameSave Data, but we also needed a way to being able to listen when the missions were added and completed.
-That´s why two FGameplayTagContainer were created, to help storage the data:
-	FGameplayTagContainer ActiveTasks;
-	FGameplayTagContainer DoneTasks;
-The GameplayTags used on these containers, were used as keys on Data Tables, so we could get acces to the proper text of the mission.
-It is also important to mention the nomenclature used for the missions. We used the root "Task." for every task, and next, we used a system of parents and childs, so we could use
-sub-missions. In case a task has no child, it is considered a single mission, if a task has a father, it is a submission. For example:
-  Task.Father
+
+Since missions need to persist throughout the game, they were stored as part of the Game Save Data. However, we also needed a way to track when missions were added or completed.
+
+For this reason, two `FGameplayTagContainer` variables were created to handle mission storage:
+
+```cpp
+FGameplayTagContainer ActiveTasks;
+FGameplayTagContainer DoneTasks;
+```
+
+The Gameplay Tags stored in these containers were used to identify their corresponding entries in the Data Tables, allowing us to retrieve the appropriate mission descriptions.
+
+It is also important to explain the naming convention used for missions. We established the root `Task.` for every mission, followed by a parent-child hierarchy that allowed us to create subtasks.
+
+If a task has no children, it is considered an independent mission. If a task has a parent, it is considered a subtask.
+
+For example:
+
+```text
+Task.Father
     Task.Father.Son1
     Task.Father.Son2
-
+```
 
 # Flow
-Once we already had the containers to storage the Active and Done missions, we needed a way to being able to tell the game when were the missions added, or completed.
-That´s when we used the Gameplay Message subsystem of Unreal Enngine. Using this subsystem, alonside to the Broadcast Message developed for it´s use in Hollow Sense, I wrote
-some special listeners, that would listen to the Gameplay Tags broadcasted alonside an specific Message.
 
-Once we defined the Message subsystem, it was time to develop the logic inside marking the tasks as Done, or not.
-At first sight, it would be easy to assume we only hace to add the tasks first to ActiveTasks, and once the are completed, we remove them from there, and add it to DoneTasks.
-But we needed a proper way to take track of the child tasks that were completed, and in case the were completed, mark the father as completed as well.
-This is were I implemented the next Pseudo-Code for a function that will be called each time a new task is marked as Done, to see if the parent could be Done as well:
+Once we had the containers to store active and completed missions, we needed a way to notify the game whenever a mission was added or completed.
+
+For this purpose, we used Unreal Engine's Gameplay Message Subsystem. By combining this subsystem with the Broadcast Message functionality previously developed for its use in Hollow Sense, I implemented custom listeners capable of detecting specific messages and retrieving the Gameplay Tags broadcast alongside them.
+
+With the messaging system established, the next step was to develop the logic responsible for marking tasks as completed.
+
+At first glance, it might seem sufficient to add missions to `ActiveTasks` and, once completed, remove them from that container and add them to `DoneTasks`.
+
+However, we also needed a way to keep track of completed subtasks and determine whether their parent task could be marked as completed as well.
+
+To achieve this, I implemented the following pseudo-code for a function that would be called whenever a new task was marked as completed, checking whether its parent could also be completed:
 
 ### Pseudo-Code
 
@@ -65,7 +85,7 @@ FUNCTION F1(DoneTask)
 
     END FOR
 
-    // Complete the parent task if all its subtasks are done
+    // Complete the parent task if all subtasks are done
     IF AllChildrenDone THEN
 
         REMOVE ParentTag FROM ActiveTasks
@@ -78,16 +98,20 @@ FUNCTION F1(DoneTask)
 END FUNCTION
 ```
 
-# Displayment
-We have already explained how we categorize the tasks, now, we need to explain how to display them on the already existing HUD.
+# HUD Integration
 
-First of all, we placed a Vertical Box, so we could display Text Blocks on it.
-The idea was to use this Vertical Box as a "page", and display some tasks on it, until it is filled, and starts filling the next one.
-For this, we would sort all the existing tasks, in both ActiveTasks and DoneTaks, and using the order in the Data Table to decide in which order will the missions be stocked,
-which ones will have a visual clue to indicate they were completed, and in which page they will be displayed.
-For this, we implemented the next Pseudo-Code:
+Now that we have explained how missions are categorized and managed, we can move on to displaying them through the existing HUD.
+
+First, we added a Vertical Box to display the mission descriptions using Text Blocks.
+
+The idea was to use this Vertical Box as a page, displaying a limited number of missions until it was filled, at which point the remaining missions would be displayed on the next page.
+
+To achieve this, we sorted all existing missions from both `ActiveTasks` and `DoneTasks`. Their order was determined by their corresponding IDs in the Data Table, allowing us to control their display order, completion indicators, and page distribution.
+
+To handle this process, we implemented the following pseudo-code:
 
 ### Pseudo-Code
+
 ```text
 FUNCTION F2()
 
@@ -168,7 +192,22 @@ FUNCTION F2()
 END FUNCTION
 ```
 
-Finally, if Id_Keys is not empty, we can start placing the tasks´ texts in the Vertical Box, according to the actual page (ap),
-displaying the tasks from the ID´s [ Id_Tops_Array[ap-1]+1, Id_Tops_Array[ap]], where we define Id_Tops_Array[-1] = -1.
+Finally, if `Id_Keys` is not empty, we can start displaying the mission descriptions inside the Vertical Box according to the currently selected page (`ap`).
+
+The tasks displayed will correspond to the IDs within the range:
+
+```text
+[Id_Tops_Array[ap-1] + 1, Id_Tops_Array[ap]]
+```
+
+Where we define:
+
+```text
+Id_Tops_Array[-1] = -1
+```
+
+This allows us to determine which tasks belong to each page while keeping their hierarchy properly organized.
+
+Finally, we use `IsDone_Task_Map` to determine whether a visual indicator should be added to each task, showing whether it has been completed or is still active.
 
 And, we will use IsDone_Tasks_Map to determinate if we will add a visual clue to mark the task as done or not.
